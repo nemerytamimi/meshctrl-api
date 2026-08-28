@@ -1,0 +1,12 @@
+# Live AMT credentials. Copy config.json.example and fill it in.
+config.json
+
+node_modules/
+
+# Disk images for IDER: large binaries, not source.
+images/*
+!images/.gitkeep
+
+# Backups
+*.bak
+*.bak-*
