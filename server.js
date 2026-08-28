@@ -458,25 +458,24 @@ async function osHandler(req, res) {
 
     // The OS sits at its own address; without one configured we can only
     // report power, never which OS is running.
-    const osHost = req.body.oshost || dev.osHost || null;
-    let probe = { os: 'unknown', reachable: false, openPorts: [], evidence: [] };
-    if (osHost && power.status === 'on') { probe = await amtboot.probeOs(osHost); }
+    const osHosts = dev.osHosts || [];
+    let probe = { os: 'unknown', osHost: null, reachable: false, openPorts: [], evidence: [] };
+    if (osHosts.length && power.status === 'on') { probe = await amtboot.probeOs(osHosts); }
 
     let label;
     if (power.status !== 'on') { label = 'Off'; }
-    else if (!osHost) { label = 'On (no osHost configured)'; }
-    else if (probe.os === 'Proxmox') { label = 'Proxmox'; }
-    else if (probe.os === 'Windows') { label = 'Windows'; }
-    else if (probe.os === 'Linux') { label = 'Linux'; }
-    else { label = 'Booting / no OS'; }
+    else if (!osHosts.length) { label = 'On (no osHosts configured)'; }
+    else if (probe.os === 'none') { label = 'Booting / no OS'; }
+    else { label = probe.os; }
 
     res.json({
-      success: true, deviceid: deviceid, host: dev.host, osHost: osHost,
+      success: true, deviceid: deviceid, host: dev.host,
+      osHosts: osHosts, osHost: probe.osHost,
       power: power.status, powerState: power.powerState,
       bootMediaIndex: power.bootMediaIndex,
       os: probe.os, osLabel: label, reachable: probe.reachable,
       openPorts: probe.openPorts, evidence: probe.evidence,
-      note: 'OS is inferred from open ports on osHost, not reported by AMT.'
+      note: 'OS is inferred from open ports across osHosts, not reported by AMT.'
     });
   } catch (error) { fail(res, error); }
 }
