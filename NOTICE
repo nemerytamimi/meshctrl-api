@@ -1,0 +1,38 @@
+meshctrl-api
+Copyright 2026 nemerytamimi
+
+This product includes software developed by Intel Corporation.
+
+--------------------------------------------------------------------------------
+Intel Active Management Technology WSMAN stack
+--------------------------------------------------------------------------------
+
+The files in lib/amt/ are copied verbatim from MeshCentral 1.1.53
+(https://github.com/Ylianst/MeshCentral), specifically its amt/ directory:
+
+    lib/amt/amt.js
+    lib/amt/amt-wsman.js
+    lib/amt/amt-wsman-comm.js
+    lib/amt/amt-xml.js
+
+    Copyright 2020-2021 Intel Corporation
+    Author: Ylian Saint-Hilaire
+    Licensed under the Apache License, Version 2.0
+
+They are vendored rather than imported so that the SOAP this service sends to
+Intel AMT is byte-identical to what a MeshCentral server would send. Each file
+retains its original copyright and license header.
+
+--------------------------------------------------------------------------------
+MeshAgent runtime modules
+--------------------------------------------------------------------------------
+
+lib/ider-runner.js loads two modules at runtime from a local MeshCentral
+installation, under the same Apache License, Version 2.0:
+
+    agents/modules_meshcmd/amt-ider.js
+    agents/modules_meshcmd/amt-redir-duk.js
+
+These are not redistributed in this repository. lib/shims/MD5Stream.js is an
+original reimplementation of the MeshAgent's native MD5Stream module against
+node's crypto, written for this project.

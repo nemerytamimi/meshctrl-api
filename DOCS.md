@@ -564,3 +564,15 @@ export MC_DEVICEID="..."
   machine's screen remains out of reach.
 - **No per-disk boot selection.** Firmware limit, see the top of this document.
 - **IDER sessions are not durable.** They die with the service process.
+
+---
+
+## License
+
+Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+The files in `lib/amt/` are copied verbatim from MeshCentral 1.1.53, Copyright
+2020-2021 Intel Corporation, author Ylian Saint-Hilaire, under the same license.
+They are vendored so the SOAP this service sends to Intel AMT is byte-identical
+to what a MeshCentral server would send, and each file keeps its original
+header. `NOTICE` records the full attribution.
