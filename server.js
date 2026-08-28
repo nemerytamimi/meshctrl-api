@@ -234,6 +234,20 @@ app.post('/device/boot', async (req, res) => {
   if (target === 'hd' || target === 'harddrive' || target === 'disk') { target = 'hdd'; }
   if (target === 'cdrom' || target === 'dvd' || target === 'iso') { target = 'cd'; }
 
+  // 'hdd2' is shorthand for target hdd, index 2.
+  let mediaIndex = req.body.index;
+  const shorthand = /^(hdd|hd|disk|cd)([0-9])$/.exec(target);
+  if (shorthand) {
+    target = (shorthand[1] === 'cd') ? 'cd' : 'hdd';
+    if (mediaIndex == null) { mediaIndex = Number(shorthand[2]); }
+  }
+  if (mediaIndex != null) {
+    mediaIndex = Number(mediaIndex);
+    if (!Number.isInteger(mediaIndex) || mediaIndex < 0 || mediaIndex > 7) {
+      return res.status(400).json({ success: false, error: 'Invalid index. Use 0 for the BIOS boot order, or 1-7 to pick the Nth device of that class.' });
+    }
+  }
+
   if (BOOT_TARGETS.indexOf(target) === -1) {
     return res.status(400).json({ success: false, error: 'Invalid target. Use one of: ' + BOOT_TARGETS.join(', ') + '.' });
   }
@@ -245,7 +259,7 @@ app.post('/device/boot', async (req, res) => {
   }
 
   const dev = (via === 'meshcentral') ? null : config.amtDevice(creds.deviceid, req.body);
-  const needsDirect = (target === 'cd' || target === 'hdd');
+  const needsDirect = (target === 'cd' || target === 'hdd' || (mediaIndex != null && mediaIndex > 0));
 
   if (dev == null) {
     if (via === 'amt') {
@@ -273,13 +287,14 @@ app.post('/device/boot', async (req, res) => {
   }
 
   try {
-    const r = await amtboot.bootTo(dev, { target: target, mode: mode, sol: sol });
+    const r = await amtboot.bootTo(dev, { target: target, mode: mode, sol: sol, mediaIndex: mediaIndex });
     res.json({
       success: true,
       route: 'amt',
       target: target,
       mode: mode,
       sol: sol,
+      index: r.mediaIndex,
       bootSource: r.bootSource,
       biosSetup: r.biosSetup,
       amtReturnValue: r.amtReturnValue,

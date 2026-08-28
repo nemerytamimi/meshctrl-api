@@ -33,36 +33,49 @@ booting arbitrary ISOs over IDE redirection.
 
 ## Can you select between boot devices?
 
-**Yes — between five device classes. No — you cannot pick which disk.**
+**Yes — including which hard disk.**
 
-`POST /device/boot` takes a `target` of `bios`, `pxe`, `cd`, `hdd`, or
-`default`, applied as a one-shot override for the next boot only.
+`POST /device/boot` takes a `target` of `bios`, `pxe`, `cd`, `hdd`, or `default`,
+plus an optional `index` selecting *which* device of that class. The override
+applies to the next boot only.
 
-The limit is the firmware, not the API. Asking AMT what it offers
-(`CIM_BootSourceSetting`) returns exactly three sources:
+```bash
+post /device/boot "{$CREDS,\"target\":\"hdd\",\"index\":2,\"mode\":\"reset\"}"
+post /device/boot "{$CREDS,\"target\":\"hdd2\",\"mode\":\"reset\"}"   # same thing
+```
 
-| InstanceID | StructuredBootString | API target |
-|---|---|---|
-| `Intel(r) AMT: Force Hard-drive Boot` | `CIM:Hard-Disk:1` | `hdd` |
-| `Intel(r) AMT: Force PXE Boot` | `CIM:Network:1` | `pxe` |
-| `Intel(r) AMT: Force CD/DVD Boot` | `CIM:CD/DVD:1` | `cd` |
+Two AMT fields are involved, and missing the second one is what makes this look
+impossible at first glance:
 
-Note `Hard-Disk:`**`1`** — a single entry, on a machine with four drives. `hdd`
-means "boot a hard drive", not "boot *that* hard drive". Per-disk selection is
-`Force OCR UEFI Boot Option N`, which needs AMT 16 or newer; this machine runs
-AMT 11.12.96.
+- `CIM_BootConfigSetting.ChangeBootOrder` picks the device **class**. This
+  firmware exposes only three sources, and there is a single hard-drive entry
+  regardless of how many disks are fitted:
 
-### So how do you choose an OS?
+  | InstanceID | StructuredBootString | API target |
+  |---|---|---|
+  | `Intel(r) AMT: Force Hard-drive Boot` | `CIM:Hard-Disk:1` | `hdd` |
+  | `Intel(r) AMT: Force PXE Boot` | `CIM:Network:1` | `pxe` |
+  | `Intel(r) AMT: Force CD/DVD Boot` | `CIM:CD/DVD:1` | `cd` |
 
-- **Bootloader.** Set the next entry from inside the running OS
-  (`grub-reboot "..."`), then `{"target":"default","mode":"reset"}`. Reliable,
-  but the machine has to be up first.
-- **BIOS setup over serial.** `{"target":"bios","sol":true}` puts you in setup
-  with the screen redirected over Serial-over-LAN. Works from cold, needs
-  someone driving it.
-- **IDER.** Stream an ISO from the API host and boot it — a rescue image, an
-  installer, or Ventoy as a boot picker. The only route that needs neither the
-  machine running nor a person at the keyboard. [See below](#ider--boot-an-arbitrary-iso).
+- `AMT_BootSettingData.BootMediaIndex` then picks **which device within that
+  class**. `0` leaves the BIOS boot order alone; `1..N` select the Nth device.
+
+Verified writable on this firmware: values 0, 1, 2, 3 and 4 were all accepted
+and read back correctly.
+
+> **What the index maps to is the BIOS's business.** AMT passes the number
+> through at POST; the ordering comes from the BIOS, and it need not match
+> physical port order, `lsblk`, or anything visible from a running OS. Nor is
+> AMT accepting the write a promise that the BIOS honours it. Find your mapping
+> empirically: boot each index and see which OS comes up.
+
+### Other ways to choose an OS
+
+- **Bootloader.** `grub-reboot "..."` from inside the running OS, then
+  `{"target":"default","mode":"reset"}`.
+- **BIOS setup over serial.** `{"target":"bios","sol":true}`.
+- **IDER.** Boot Ventoy or a rescue ISO and pick from there — the only route
+  needing neither the machine running nor a person at the keyboard.
 
 ---
 
@@ -268,7 +281,8 @@ Override the next boot device, then power on or reset into it.
 
 | Field | | Meaning |
 |---|---|---|
-| `target` | required | `bios` · `pxe` · `cd` · `hdd` · `default`. Aliases: `hd`/`harddrive`/`disk` → `hdd`, `cdrom`/`dvd`/`iso` → `cd` |
+| `target` | required | `bios` · `pxe` · `cd` · `hdd` · `default`. Aliases: `hd`/`harddrive`/`disk` → `hdd`, `cdrom`/`dvd`/`iso` → `cd`. Shorthand `hdd2` means target `hdd`, index `2`. |
+| `index` | optional | Which device of that class. `0` (default) uses the BIOS boot order; `1`-`7` select the Nth. Sets `AMT_BootSettingData.BootMediaIndex`. Direct-AMT route only. |
 | `mode` | optional | `poweron` from cold (default) · `reset` to reboot a running machine |
 | `sol` | optional | `bios` only. Redirect setup to Serial-over-LAN. |
 | `via` | optional | `auto` (default) · `amt` · `meshcentral` |
@@ -304,7 +318,7 @@ not support IDER boot" and is really just leftover state. So every call issues
 ```
 1. ChangeBootOrder(null)          drop any leftover override
 2. read AMT_BootSettingData
-3. Put  UseIDER, IDERBootDevice, BIOSSetup, UseSOL
+3. Put  UseIDER, IDERBootDevice, BootMediaIndex, BIOSSetup, UseSOL
 4. SetBootConfigRole(1)
 5. ChangeBootOrder(<source>)
 6. RequestPowerStateChange
@@ -562,7 +576,6 @@ export MC_DEVICEID="..."
 - **No SOL console.** `sol: true` tells the firmware to redirect BIOS setup to
   Serial-over-LAN, but nothing in the API reads that serial stream. Seeing the
   machine's screen remains out of reach.
-- **No per-disk boot selection.** Firmware limit, see the top of this document.
 - **IDER sessions are not durable.** They die with the service process.
 
 ---

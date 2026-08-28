@@ -184,10 +184,14 @@ are rejected on this route.
 
 #### Picking a specific OS
 
-Intel AMT selects a boot device **class**, not an individual disk — note the
-single `CIM:Hard-Disk:1` entry above, even on a machine with four drives.
-Per-disk selection (`Force OCR UEFI Boot Option N`) needs AMT 16 or newer; the
-P520 is on AMT 11. To choose between OSes installed on different drives:
+`ChangeBootOrder` selects a boot device **class** — note the single
+`CIM:Hard-Disk:1` entry, even on a machine with four drives. To pick *which*
+disk, pass `index`, which sets `AMT_BootSettingData.BootMediaIndex`: `0` uses
+the BIOS boot order, `1..N` select the Nth device of that class. Values 0-4 are
+verified writable on this firmware. What each index maps to is decided by the
+BIOS, so establish the mapping empirically.
+
+Other ways to choose between OSes installed on different drives:
 
 - set the next entry from inside the running OS (`grub-reboot`), then
   `{"target":"default","mode":"reset"}`; or
