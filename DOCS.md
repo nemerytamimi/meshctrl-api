@@ -400,6 +400,37 @@ The two outcomes look nothing alike.
 
 ---
 
+### Which OS is running
+
+```
+GET|POST /device/os?deviceid=...
+```
+
+Returns live AMT power state plus a best-effort guess at the running OS.
+
+**AMT cannot see the operating system**, and on this hardware it does not even
+share an address with it. `AMT_EthernetPortSettings` reports `SharedMAC: true`
+with `SharedDynamicIP: true`: AMT holds a static address on the shared NIC while
+the OS takes its own DHCP lease. Probing the AMT address therefore only ever
+reaches firmware — it answers with TTL 255 and nothing but port 16992.
+
+So the OS address is configured separately, as `osHost` in `config.json`. Ports
+are then checked in order of how decisive they are, not by counting votes:
+
+| Port | Service | Decides |
+| --- | --- | --- |
+| 8006 | Proxmox web UI | Proxmox |
+| 3389 | RDP | Windows |
+| 445 | SMB | Windows |
+| 22 | SSH | Linux |
+
+Order matters because a Windows host running OpenSSH Server answers on 22 as
+well as 3389; counting matches would tie, so the first decisive port wins.
+
+`osLabel` is `Proxmox`, `Windows`, `Linux`, `Booting / no OS`, `Off`, or
+`On (no osHost configured)`. The machine may also block ICMP — ping is not used
+for this reason.
+
 ## Action table
 
 Accepted by `/device/power`. `actiontype` is the value sent to MeshCentral; for

@@ -419,17 +419,69 @@ async function statusHandler(req, res) {
     const node = await mesh.getNode(creds.cfg, creds.deviceid);
     if (node == null) { return res.status(404).json({ success: false, error: 'Device not found on this MeshCentral server.' }); }
     const conn = node.conn | 0;
+
+    // MeshCentral's cached pwr goes stale on AMT-only nodes, so ask the
+    // firmware directly whenever we hold credentials for it.
+    let live = null, source = 'meshcentral';
+    const amtdev = config.amtDevice(mesh.shortId(node._id), req.body);
+    if (amtdev != null) {
+      try { live = await amtboot.powerState(amtdev); source = 'amt'; } catch (ex) { live = null; }
+    }
+
     res.json({
       success: true,
       deviceid: mesh.shortId(node._id),
       name: node.name || 'N/A',
-      status: mesh.powerStateName(node.pwr),
-      powerState: node.pwr != null ? node.pwr : null,
+      status: live ? live.status : mesh.powerStateName(node.pwr),
+      powerState: live ? live.powerState : (node.pwr != null ? node.pwr : null),
+      powerSource: source,
+      bootMediaIndex: live ? live.bootMediaIndex : null,
+      cachedStatus: mesh.powerStateName(node.pwr),
       connectivity: { agent: (conn & 1) !== 0, cira: (conn & 2) !== 0, amt: (conn & 4) !== 0, raw: conn },
       amtVersion: node.intelamt ? node.intelamt.ver : null
     });
   } catch (error) { fail(res, error); }
 }
+
+// Power state plus a best-effort guess at which OS is running. AMT cannot see
+// the OS, so the guess comes from which OS-side ports answer.
+async function osHandler(req, res) {
+  req.body = Object.assign({}, req.query, req.body);
+  const deviceid = req.body.deviceid;
+  if (!deviceid) { return res.status(400).json({ success: false, error: 'Missing required parameter: deviceid' }); }
+  const dev = config.amtDevice(deviceid, req.body);
+  if (dev == null) {
+    return res.status(400).json({ success: false, error: 'No Intel AMT credentials configured for this device.' });
+  }
+  try {
+    const power = await amtboot.powerState(dev);
+
+    // The OS sits at its own address; without one configured we can only
+    // report power, never which OS is running.
+    const osHost = req.body.oshost || dev.osHost || null;
+    let probe = { os: 'unknown', reachable: false, openPorts: [], evidence: [] };
+    if (osHost && power.status === 'on') { probe = await amtboot.probeOs(osHost); }
+
+    let label;
+    if (power.status !== 'on') { label = 'Off'; }
+    else if (!osHost) { label = 'On (no osHost configured)'; }
+    else if (probe.os === 'Proxmox') { label = 'Proxmox'; }
+    else if (probe.os === 'Windows') { label = 'Windows'; }
+    else if (probe.os === 'Linux') { label = 'Linux'; }
+    else { label = 'Booting / no OS'; }
+
+    res.json({
+      success: true, deviceid: deviceid, host: dev.host, osHost: osHost,
+      power: power.status, powerState: power.powerState,
+      bootMediaIndex: power.bootMediaIndex,
+      os: probe.os, osLabel: label, reachable: probe.reachable,
+      openPorts: probe.openPorts, evidence: probe.evidence,
+      note: 'OS is inferred from open ports on osHost, not reported by AMT.'
+    });
+  } catch (error) { fail(res, error); }
+}
+app.get('/device/os', osHandler);
+app.post('/device/os', osHandler);
 
 app.post('/device/amt/status', statusHandler);
 app.post('/device/status', statusHandler);

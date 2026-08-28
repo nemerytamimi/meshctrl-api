@@ -1,16 +1,22 @@
 {
   "amt": {
-    "defaults": { "port": 16992, "tls": false, "user": "admin" },
+    "defaults": {
+      "port": 16992,
+      "tls": false,
+      "user": "admin"
+    },
     "devices": {
       "2BgTHkUOFCI8am0NavG1uOojz12UYt9enJC3fCEoJTOi6TaNowOnqYtaByjuTWBp": {
-        "host": "10.10.0.234",
+        "host": "10.0.0.10",
         "user": "admin",
-        "pass": "REPLACE_ME"
+        "pass": "REPLACE_ME",
+        "osHost": "10.0.0.11"
       },
       "PmDyZLhN0lOvVERCkz6H5MzU320NIU6q8LFak8uvBB5jDIYx0Vq$gZNtflC6EHYf": {
-        "host": "192.168.1.234",
+        "host": "10.0.0.10",
         "user": "admin",
-        "pass": "REPLACE_ME"
+        "pass": "REPLACE_ME",
+        "osHost": "10.0.0.11"
       }
     }
   }
